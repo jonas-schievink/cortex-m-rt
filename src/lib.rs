@@ -546,7 +546,6 @@ pub unsafe extern "C" fn Reset() -> ! {
 
 #[allow(unused_variables)]
 #[doc(hidden)]
-#[link_section = ".HardFault.default"]
 #[no_mangle]
 pub unsafe extern "C" fn HardFault_(ef: &ExceptionFrame) -> ! {
     loop {
@@ -604,7 +603,7 @@ pub use self::Exception as exception;
 extern "C" {
     fn NonMaskableInt();
 
-    fn HardFaultTrampoline();
+    fn HardFault();
 
     #[cfg(not(armv6m))]
     fn MemoryManagement();
@@ -643,7 +642,7 @@ pub static __EXCEPTIONS: [Vector; 14] = [
         handler: NonMaskableInt,
     },
     // Exception 3: Hard Fault Interrupt.
-    Vector { handler: HardFaultTrampoline },
+    Vector { handler: HardFault },
     // Exception 4: Memory Management Interrupt [not on Cortex-M0 variants].
     #[cfg(not(armv6m))]
     Vector {
@@ -689,6 +688,65 @@ pub static __EXCEPTIONS: [Vector; 14] = [
     Vector { handler: PendSV },
     // Exception 15: System Tick Interrupt.
     Vector { handler: SysTick },
+];
+
+extern "C" {
+    fn TrampolinedNonMaskableInt();
+
+    fn TrampolinedHardFault();
+
+    #[cfg(not(armv6m))]
+    fn TrampolinedMemoryManagement();
+
+    #[cfg(not(armv6m))]
+    fn TrampolinedBusFault();
+
+    #[cfg(not(armv6m))]
+    fn TrampolinedUsageFault();
+
+    #[cfg(armv8m)]
+    fn TrampolinedSecureFault();
+}
+
+/// These have the same layout as `__EXCEPTIONS` above, except there's only fault handlers. This
+/// table is used by the ASM trampoline.
+// TODO: Make this as small as possible depending on the target!
+#[doc(hidden)]
+#[link_section = ".trampoline"]
+#[no_mangle]
+pub static __TRAMPOLINED_EXCEPTIONS: [Vector; 6] = [
+    // Exception 2: Non Maskable Interrupt.
+    Vector {
+        handler: TrampolinedNonMaskableInt,
+    },
+    // Exception 3: Hard Fault Interrupt.
+    Vector { handler: TrampolinedHardFault },
+    // Exception 4: Memory Management Interrupt [not on Cortex-M0 variants].
+    #[cfg(not(armv6m))]
+    Vector {
+        handler: TrampolinedMemoryManagement,
+    },
+    #[cfg(armv6m)]
+    Vector { reserved: 0 },
+    // Exception 5: Bus Fault Interrupt [not on Cortex-M0 variants].
+    #[cfg(not(armv6m))]
+    Vector { handler: TrampolinedBusFault },
+    #[cfg(armv6m)]
+    Vector { reserved: 0 },
+    // Exception 6: Usage Fault Interrupt [not on Cortex-M0 variants].
+    #[cfg(not(armv6m))]
+    Vector {
+        handler: TrampolinedUsageFault,
+    },
+    #[cfg(armv6m)]
+    Vector { reserved: 0 },
+    // Exception 7: Secure Fault Interrupt [only on Armv8-M].
+    #[cfg(armv8m)]
+    Vector {
+        handler: TrampolinedSecureFault,
+    },
+    #[cfg(not(armv8m))]
+    Vector { reserved: 0 },
 ];
 
 // If we are not targeting a specific device we bind all the potential device specific interrupts

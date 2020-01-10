@@ -364,12 +364,13 @@ pub fn exception(args: TokenStream, input: TokenStream) -> TokenStream {
             let valid_signature = f.sig.constness.is_none()
                 && f.vis == Visibility::Inherited
                 && f.sig.abi.is_none()
-                && f.sig.inputs.len() == 1
-                && match &f.sig.inputs[0] {
-                    FnArg::Typed(arg) => match arg.ty.as_ref() {
+                && f.sig.inputs.len() <= 1
+                && match f.sig.inputs.first() {
+                    Some(FnArg::Typed(arg)) => match arg.ty.as_ref() {
                         Type::Reference(r) => r.lifetime.is_none() && r.mutability.is_none(),
                         _ => false,
                     },
+                    None => true,
                     _ => false,
                 }
                 && f.sig.generics.params.is_empty()
@@ -386,22 +387,39 @@ pub fn exception(args: TokenStream, input: TokenStream) -> TokenStream {
             if !valid_signature {
                 return parse::Error::new(
                     fspan,
-                    "`HardFault` handler must have signature `[unsafe] fn(&ExceptionFrame) -> !`",
+                    "`HardFault` handler must have signature `[unsafe] fn([&ExceptionFrame]) -> !`",
                 )
                 .to_compile_error()
                 .into();
             }
 
+            let needs_trampoline = f.sig.inputs.len() == 1;
+            let (frame_parameter, frame_argument) = if f.sig.inputs.len() == 1 {
+                // Takes `&ExceptionFrame` argument. This requires the asm shim to pass it to us.
+                (quote!(frame: &::cortex_m_rt::ExceptionFrame), quote!(frame))
+            } else {
+                // No argument => Don't need asm shim
+                (quote!(), quote!())
+            };
+
             f.sig.ident = Ident::new(&format!("__cortex_m_rt_{}", f.sig.ident), Span::call_site());
             let tramp_ident = Ident::new(&format!("{}_trampoline", f.sig.ident), Span::call_site());
             let ident = &f.sig.ident;
 
+            let symbol_name = if needs_trampoline {
+                format!("TrampolinedHardFault")
+            } else {
+                format!("HardFault")
+            };
+
+            // TODO generate a `TrampolinedHardFault` symbol when overriding `HardFault`
+            // This prevents conflicting hard-fault handlers
+
             quote!(
                 #[doc(hidden)]
-                #[export_name = "HardFault"]
-                #[link_section = ".HardFault.user"]
-                pub unsafe extern "C" fn #tramp_ident(frame: &::cortex_m_rt::ExceptionFrame) {
-                    #ident(frame)
+                #[export_name = #symbol_name]
+                pub unsafe extern "C" fn #tramp_ident(#frame_parameter) {
+                    #ident(#frame_argument)
                 }
 
                 #f

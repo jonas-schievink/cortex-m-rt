@@ -1,0 +1,5 @@
+x = 42
+Return from NMI
+HardFault
+PC=0xe0000000
+LR looks about right

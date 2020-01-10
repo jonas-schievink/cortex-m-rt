@@ -72,12 +72,12 @@ main() {
     case $TARGET in
         thumbv6m-none-eabi|thumbv7m-none-eabi)
             # linking with GNU LD
-            env RUSTFLAGS="-C linker=arm-none-eabi-ld -C link-arg=-Tlink.x" cargo run --target "$TARGET" --example qemu | grep "x = 42"
-            env RUSTFLAGS="-C linker=arm-none-eabi-ld -C link-arg=-Tlink.x" cargo run --target "$TARGET" --example qemu --release | grep "x = 42"
+            env RUSTFLAGS="-C linker=arm-none-eabi-ld -C link-arg=-Tlink.x" cargo run --target "$TARGET" --example qemu | diff examples/qemu.out -
+            env RUSTFLAGS="-C linker=arm-none-eabi-ld -C link-arg=-Tlink.x" cargo run --target "$TARGET" --example qemu --release | diff examples/qemu.out -
 
             # linking with rustc's LLD
-            cargo run --target "$TARGET" --example qemu | grep "x = 42"
-            cargo run --target "$TARGET" --example qemu --release | grep "x = 42"
+            cargo run --target "$TARGET" --example qemu | diff examples/qemu.out -
+            cargo run --target "$TARGET" --example qemu --release | diff examples/qemu.out -
             ;;
     esac
 

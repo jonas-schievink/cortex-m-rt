@@ -32,14 +32,19 @@ EXTERN(__RESET_VECTOR); /* depends on the `Reset` symbol */
    the `exception!` macro) */
 EXTERN(__EXCEPTIONS); /* depends on all the these PROVIDED symbols */
 
+EXTERN(FaultTrampoline);
 EXTERN(DefaultHandler);
 
-PROVIDE(NonMaskableInt = DefaultHandler);
-EXTERN(HardFaultTrampoline);
-PROVIDE(MemoryManagement = DefaultHandler);
-PROVIDE(BusFault = DefaultHandler);
-PROVIDE(UsageFault = DefaultHandler);
-PROVIDE(SecureFault = DefaultHandler);
+/* Point the fault handlers to the ASM shim in `asm.s` by default */
+/* If the user overrides one of these, and doesn't take an `&ExceptionFrame` argument, the
+   `#[exception]` macro will override this symbol, skipping the ASM trampoline */
+PROVIDE(NonMaskableInt = FaultTrampoline);
+PROVIDE(HardFault = FaultTrampoline);
+PROVIDE(MemoryManagement = FaultTrampoline);
+PROVIDE(BusFault = FaultTrampoline);
+PROVIDE(UsageFault = FaultTrampoline);
+PROVIDE(SecureFault = FaultTrampoline);
+
 PROVIDE(SVCall = DefaultHandler);
 PROVIDE(DebugMonitor = DefaultHandler);
 PROVIDE(PendSV = DefaultHandler);
@@ -47,6 +52,18 @@ PROVIDE(SysTick = DefaultHandler);
 
 PROVIDE(DefaultHandler = DefaultHandler_);
 PROVIDE(HardFault = HardFault_);
+
+/* # Post-trampoline exception handlers */
+/* These are looked up and invoked by the ASM fault trampoline in `asm.s` and will be overridden by
+   the `#[exception]` macro when the `&ExceptionFrame` argument is used. */
+EXTERN(__TRAMPOLINED_EXCEPTIONS);
+
+PROVIDE(TrampolinedNonMaskableInt = DefaultHandler);
+PROVIDE(TrampolinedHardFault = DefaultHandler);
+PROVIDE(TrampolinedMemoryManagement = DefaultHandler);
+PROVIDE(TrampolinedBusFault = DefaultHandler);
+PROVIDE(TrampolinedUsageFault = DefaultHandler);
+PROVIDE(TrampolinedSecureFault = DefaultHandler);
 
 /* # Interrupt vectors */
 EXTERN(__INTERRUPTS); /* `static` variable similar to `__EXCEPTIONS` */
@@ -85,9 +102,8 @@ SECTIONS
   /* ### .text */
   .text _stext :
   {
+    *(.trampoline);
     *(.text .text.*);
-    *(.HardFaultTrampoline);
-    *(.HardFault.*);
     . = ALIGN(4);
     __etext = .;
   } > FLASH
